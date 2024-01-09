@@ -25,9 +25,20 @@ struct GraphPaperConfig {
     }
 }
 
-struct DataPoint {
+struct Edge {
+    var a: Int
+    var b: Int
+}
+
+struct Vertex {
     var x: Double
     var y: Double
+    var z: Double
+}
+
+struct VertexBuffer {
+    var vertices: [Vertex]
+    var edges: [Edge]
 }
 
 struct GraphPaperView: View {
@@ -35,19 +46,19 @@ struct GraphPaperView: View {
     var config: GraphPaperConfig
     
     @State
-    var data: [DataPoint]
+    var data: VertexBuffer
     
     private let numberOfLines = 20
     
     init() {
-        data = []
-        config = GraphPaperConfig(x: GraphPaperConfigAxis(min: -10, max: 10),
-                                  y: GraphPaperConfigAxis(min: -10, max: 10),
+        data = VertexBuffer(vertices: [], edges: [])
+        config = GraphPaperConfig(x: GraphPaperConfigAxis(min: -5, max: 5),
+                                  y: GraphPaperConfigAxis(min: -5, max: 5),
                                   rule: true,
                                   legend: true)
     }
     
-    init(config: GraphPaperConfig, data: [DataPoint]) {
+    init(config: GraphPaperConfig, data: VertexBuffer) {
         self.data = data
         self.config = config
     }
@@ -57,11 +68,17 @@ struct GraphPaperView: View {
             drawSquares(context: context, size: size)
             drawXAxis(context: context, size: size)
             drawYAxis(context: context, size: size)
-            var previousPoint: CGPoint?
-            for datum in data {
-                let point = CGPoint(x: datum.x, y: datum.y)
-                drawPoint(context: context, size: size, point: point, previousPoint: previousPoint)
-                previousPoint = point
+            var points: [CGPoint] = []
+            for vertex in data.vertices {
+                let point = CGPoint(x: vertex.x/vertex.z, y: vertex.y/vertex.z)
+                points.append(point)
+                drawVertex(context: context, size: size, point: point)
+            }
+            
+            for edge in data.edges {
+                let from = points[edge.a]
+                let to = points[edge.b]
+                drawEdge(context: context, size: size, from: from, to: to)
             }
         }
         .padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
@@ -168,35 +185,60 @@ struct GraphPaperView: View {
         }
     }
     
-    func drawPoint(context: GraphicsContext, size: CGSize, point: CGPoint, previousPoint: CGPoint?) {
+    func drawVertex(context: GraphicsContext, size: CGSize, point: CGPoint) {
         let (originX, originY) = origin(size: size)
         let (scaleX, scaleY) = scaleFactor(size: size)
         let transform = CGAffineTransform(translationX: originX, y: originY)
             .scaledBy(x: scaleX, y: -scaleY)
         
         var dot = Path()
-        dot.addEllipse(in: CGRect(origin: CGPoint(x: point.x - 0.05, y: point.y - 0.05), size: CGSize(width: 0.1, height: 0.1)))
+        dot.addEllipse(in: CGRect(origin: CGPoint(x: point.x - 0.025, y: point.y - 0.025), size: CGSize(width: 0.05, height: 0.05)))
         dot = dot.applying(transform)
         context.fill(dot, with: .color(.purple))
+    }
+    
+    func drawEdge(context: GraphicsContext, size: CGSize, from: CGPoint, to: CGPoint) {
+        let (originX, originY) = origin(size: size)
+        let (scaleX, scaleY) = scaleFactor(size: size)
+        let transform = CGAffineTransform(translationX: originX, y: originY)
+            .scaledBy(x: scaleX, y: -scaleY)
         
-        if (previousPoint != nil) {
-            var line = Path()
-            line.move(to: previousPoint!)
-            line.addLine(to: point)
-            line = line.applying(transform)
-            context.stroke(line, with: .color(.purple), style: StrokeStyle(lineWidth: 1, dash: [5]))
-        }
+        var line = Path()
+        line.move(to: from)
+        line.addLine(to: to)
+        line = line.applying(transform)
+        context.stroke(line, with: .color(.purple), style: StrokeStyle(lineWidth: 1, dash: [5]))
     }
 }
 
 #Preview {
     GraphPaperView(config: GraphPaperConfig(
-                        x: GraphPaperConfigAxis(min: -10, max: 10),
-                        y: GraphPaperConfigAxis(min: -10, max: 10),
+                        x: GraphPaperConfigAxis(min: -3, max: 3),
+                        y: GraphPaperConfigAxis(min: -3, max: 3),
                         rule: true,
                         legend: true),
-                   data: [ DataPoint(x: 1, y: 1),
-                           DataPoint(x: 2, y: 2),
-                           DataPoint(x: -3, y: -3) ]
+                   data: VertexBuffer(vertices: [
+                        Vertex(x: -0.5, y: -0.5, z: 2.5),
+                        Vertex(x: -0.5, y:  0.5, z: 2.5),
+                        Vertex(x:  0.5, y:  0.5, z: 2.5),
+                        Vertex(x:  0.5, y: -0.5, z: 2.5),
+                        Vertex(x: -0.5, y: -0.5, z: 3.5),
+                        Vertex(x: -0.5, y:  0.5, z: 3.5),
+                        Vertex(x:  0.5, y:  0.5, z: 3.5),
+                        Vertex(x:  0.5, y: -0.5, z: 3.5)
+                   ], edges: [
+                        Edge(a: 0, b: 1),
+                        Edge(a: 1, b: 2),
+                        Edge(a: 2, b: 3),
+                        Edge(a: 3, b: 0),
+                        Edge(a: 0, b: 4),
+                        Edge(a: 1, b: 5),
+                        Edge(a: 2, b: 6),
+                        Edge(a: 3, b: 7),
+                        Edge(a: 4, b: 5),
+                        Edge(a: 5, b: 6),
+                        Edge(a: 6, b: 7),
+                        Edge(a: 7, b: 4),
+                    ])
     )
 }
